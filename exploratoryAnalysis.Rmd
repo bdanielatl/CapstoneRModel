@@ -1,33 +1,61 @@
 ---
-title: "TextExploratoryAnalysis"
+title: "Exploratory Analysis of Copora for Text Mining"
 author: "Ben Daniel"
 date: "March 15, 2016"
 output: html_document
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(NLP)
 library(tm)
 library(reader)
+library(wordcloud)
+library(RTextTools)
+library(RWeka)
+library(slam)
+library(SnowballC)
 ```
+# Introduction
+Text Mining and Predictive Text Analytics are interesting areas of study and application in the modern world of data science.  Their applications are numerous including forensics, marketing, and customer relationship management.  Even mobile devices leverage text mining as keyboards predict the word a user is about to type in order to improve text entry.
 
-## R Markdown
+The Capstone Project for the Data Science Certificate offered by Johns Hopkins University requires students to write a prediction model for text using the principles learned in the certification courses. This report is an analysis of the corpora (the text samples) given for building the prediction algorithm.  It will suvery the documents, provide summary information about them and discuss intersting findings.  Additionally, it will cover the sampling and modeling strategy to complete the modeling assignment.
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r echo=FALSE}
+        #get file if it does not already exist and unzip contents
+        fileName <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+        destFile <- "data/Coursera-SwiftKey.zip"
+        
+        #set code for processing files into vectors (this may be an input into the shiny app at the end)
+        lang_code <- "en_US"
+        #data source type (twitter, etc.) -- this also could be an input from the shiny app
+        dataSource<-".twitter.txt"  #other choice includes news.txt and blogs.txt
+        #load profanity for filtering
+        con_bw<-file("data/bad-words.txt")
+        profanity<-readLines(con_bw)
+        close(con_bw)
+        
+        #set the seed to enable reproducible research
+        set.seed(1234)
+        
+        if(!file.exists("data/Coursera-SwiftKey.zip"))
+        {
+                download.file(fileName,destfile = destFile)
+                unzip("data/Coursera-SwiftKey.zip", junkpaths = TRUE,overwrite = TRUE, exdir="data")
+        }
+        #make sure to get the bad-words file 
+        if(!file.exists("data/bad-words.txt")){
+                download.file("http://www.cs.cmu.edu/~biglou/resources/bad-words.txt",destfile="data/bad-words.txt")
+        }
+        #read in the profanity base
+        con_bw<-file("data/bad-words.txt")
+        profanity<-readLines(con_bw)
+        close(con_bw)
+        
+        #load data
+(copora <- VCorpus(DirSource("data/final/en_US/"),readerControl=list(language="en")))
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+#Data Survey
+First, lets look at the data given to us.  Reading in the directory of text samples, we see the following:
+```{r echo=TRUE}
+metaCopora<-lapply(copora[1:length(copora)],meta)
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

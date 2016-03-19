@@ -36,6 +36,10 @@ if(!file.exists("data/Coursera-SwiftKey.zip"))
 if(!file.exists("data/bad-words.txt")){
         download.file("http://www.cs.cmu.edu/~biglou/resources/bad-words.txt",destfile="data/bad-words.txt")
 }
+#read in the profanity base
+con_bw<-file("data/bad-words.txt")
+profanity<-readLines(con_bw)
+close(con_bw)
 
 #load data
 (copora <- VCorpus(DirSource("data/final/en_US/"),readerControl=list(language="en")))
@@ -47,10 +51,9 @@ metaCopora<-lapply(copora[1:length(copora)],meta)
 originalLengths<-lapply( lapply(copora[1:length(copora)],as.character) , length)
 
 
-
-#reading files and writing out the samples to a temporary space
-#startLine <- sample(1:10000,size=1,replace=T)
 startLine <- 1
+
+
 
 sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt",
                                startLine=sample(1:10000,size=1,replace=T),
@@ -62,9 +65,7 @@ sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt"
         }
         #now that the skip point has been reached, read the rest of the file
         #read in the profanity filter
-        con_bw<-file("data/bad-words.txt")
-        profanity<-readLines(con_bw)
-        close(con_bw)
+
         #newfile <- readLines(con)
 
         #read vector //how many samples to use
@@ -74,22 +75,6 @@ sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt"
         df<-data.frame(txt=character())
         #define function
 
-        #now read in 1000
-        # for(i in 1:rv){
-        #         #read in the lines from the sample
-        #         txtR<-readLines(con,sample(1:6,size=1,replace=T))
-        #         # txtR<-tolower(txtR)
-        #         # #remove any profanity and non-word characters such as punctuation
-        #         # txtR<-removeWords(txtR,profanity) #removeWords comes from the tm package
-        #         # txtR<-removeWords(txtR,stopwords("SMART")) #SMART is an argument to the tm.stopwords function
-        #         # txtR<-removeNumbers(txtR)
-        #         # txtR<-removePunctuation(txtR)
-        #         #remove all unnecessary trailing white space and any extra space from the cleanup
-        #         #activities above
-        #         # txtR<-gsub("^\\s+|\\s+$", "",  gsub("\\s{2,}"," ",txtR))
-        #         df<-rbind(df, data.frame(txt=txtR,stringsAsFactors = FALSE))
-        #         print(i)
-        # }
         txtR<-readLines(con,n=readvector,skipNul=TRUE)
         
         close(con) #done reading lines, now write lines
@@ -144,60 +129,14 @@ createTextFrequencyDF <- function (controlArg){
 
 wf<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)))
 
-########### Experiment Station
-#tmpdtm<-DocumentTermMatrix(copora,control=list(wordLengths=c(4,20)))
-#inspect(tmpdtm[1:2,1:10])
-
-#tdm<-TermDocumentMatrix(copora,control=list(wordLengths=c(4,20)))
-
-#matrix<-create_matrix(copora,ngramLength = 3)
-
-#########
-#create tokenizer
-#http://jaydenmacrae.blogspot.com/2013/12/word-pair-and-triplet-frequencies.html
-# ngt <- function(x) NGramTokenizer(x, Weka_control(min=1,max=2))
-# tdm <- TermDocumentMatrix(copora, control= list(tokenize = ngt))
-# 
-# terms <- data.frame(term = tdm$dimnames$Terms, 
-#                     freq=slam::row_sums(tdm), 
-#                     row.names=NULL)
-# 
-# makeTokenMatrix<-function(min, max,textContent){
-#         nGramTokenizer <-function(x) NGramTokenizer(x, Weka_control(min = min, max = max))
-#         dtm<- DocumentTermMatrix(Corpus(textContent),control=list(weighting=weightTf,tokenize=nGramTokenizer))
-#         ngramMatrix<-as.matrix(dtm)
-#         return (ngramMatrix)
-# }
-
-
 # Sets the default number of threads to use
-options(mc.cores=1)
+options(mc.cores=1)  #on MacOS you have to set the cores to single
 BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
 ngf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer))
 
-#refind the list by filtering
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+tgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer))
 
-# #us the tm packages VectorSource method to tranfrom the pasted, processed text into vectors
-# corpus_source<-VectorSource(paste(df$txt,collapse= " "))
-# #use the Corpus function to turn the vector into a corpus that fits into the 
-# #data spec defined by the tm package
-# corpus<-Corpus(corpus_source)
-# 
-# #sample from https://deltadna.com/blog/text-mining-in-r-for-term-frequency/
-# 
-# #now create a document term matrix
-# dtm<-DocumentTermMatrix(corpus)
-# 
-# #covert to normal matrix
-# dtm2<-as.matrix(dtm)
-# #computer the frequency
-# frequency<-colSums(dtm2)
-# frequency<-sort(frequency,decreasing=TRUE)
 
-# #covert to normal matrix
-# dtm2<-as.matrix(dtm)
-# #computer the frequency
-# frequency<-colSums(dtm2)
-# frequency<-sort(frequency,decreasing=TRUE)
 
 

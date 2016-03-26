@@ -1,3 +1,4 @@
+
 #read in the english files into objects
 #requuire the tm library
 library(NLP)
@@ -10,6 +11,7 @@ library(slam)
 library(tau)
 library(SnowballC)
 library(dplyr)
+library(stringi)
 
 #textAssociations is based off of the ExploratoryAnalysis.R file which I wrote for the second assignment.
 
@@ -49,26 +51,26 @@ sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt"
                                startLine=sample(1:10000,size=1,replace=T),
                                readvector=1000){
         con<- file(dataSourcePath,open="r")
-
+        
         for(i in 1:startLine){
                 txtTmp<-readLines(con,1)
         }
         #now that the skip point has been reached, read the rest of the file
         #read in the profanity filter
-
+        
         #newfile <- readLines(con)
-
+        
         #read vector //how many samples to use
         rv<-readvector
-
+        
         #dataframe
         df<-data.frame(txt=character())
         #define function
-
+        
         txtR<-readLines(con,n=readvector,skipNul=TRUE)
         
         close(con) #done reading lines, now write lines
-
+        
         # write the text to a file; the [[1]][[4]] gets the file name of the original document
         write.table(txtR,paste0("temp/",strsplit(dataSourcePath,"/")[[1]][4]),col.names=FALSE)
 }
@@ -87,47 +89,56 @@ createTextFrequencyDF <- function (corpustext,controlArg,source=""){
         wf=data.frame(term=names(freq),
                       occurrences=freq,
                       #cumfreqpct=cumsum((freq/sum(freq))*100),
-                      source=source
+                      source=source,stringsAsFactors = FALSE
         )
         return (wf)
 }
 
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.blogs.txt",startLine=startLine,
-                    readvector=50000)
+                    readvector=500)
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.twitter.txt",startLine=startLine,
-                    readvector=50000)
+                    readvector=500)
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.news.txt",startLine=startLine,
-                    readvector=50000)
+                    readvector=500)
 
 (corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
 
- corpora<-tm_map(corpora,content_transformer(tolower))
- corpora<-tm_map(corpora,removeNumbers)
- corpora<-tm_map(corpora,removePunctuation)
- #corpora<-tm_map(corpora, removeWords, stopwords("english"))
- #corpora<-tm_map(corpora, removeWords, stopwords("SMART"))
- corpora<-tm_map(corpora,removeWords, profanity) #removeWords comes from the tm package
- corpora<-tm_map(corpora,stripWhitespace)
- #corpora<-tm_map(corpora,stemDocument,lazy = TRUE)
+corpora<-tm_map(corpora,content_transformer(tolower))
+corpora<-tm_map(corpora,removeNumbers)
+corpora<-tm_map(corpora,removePunctuation)
+#corpora<-tm_map(corpora, removeWords, stopwords("english"))
+#corpora<-tm_map(corpora, removeWords, stopwords("SMART"))
+corpora<-tm_map(corpora,removeWords, profanity) #removeWords comes from the tm package
+corpora<-tm_map(corpora,stripWhitespace)
+#corpora<-tm_map(corpora,stemDocument,lazy = TRUE)
 
 #myCorpus <- corpus(corpora) #trying to create a corpus object with quanteda, this is giving a bug
 #nrow(docvars) == length(x) is not TRUE
 
- # options(mc.cores=1)  #on MacOS you have to set the cores to single
- # BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
- # bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="All Docs")
- # 
- # TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
- # tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="All Docs")
+ options(mc.cores=1)  #on MacOS you have to set the cores to single
+ BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+ bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="All Docs")
+# 
+ TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+ tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="All Docs")
 
- # QuadgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 4))
- # qgf<-createTextFrequencyDF(controlArg =  list(tokenize =  QuadgramTokenizer),corpustext = corpora, source="All Docs")
- # 
+ QuadgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
+ qgf<-createTextFrequencyDF(controlArg =  list(tokenize =  QuadgramTokenizer),corpustext = corpora, source="All Docs")
+#
 #get the individual probablities of each quadgram and then 
- #multiply it by a lambda coefficient, then add them together.
+#multiply it by a lambda coefficient, then add them together.
  
- #https://www.coursera.org/learn/data-science-project/module/VNKmf/discussions/HmPU3OvyEeWfwAohgaM63Q
  
+ dft<- mutate(tgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
+ dfb<- mutate(bgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
+ dfq<- mutate(qgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
+ 
+ dfngram<-bind_rows(dfb,dft) %>% bind_rows(dfq)
+ dfngram<-group_by(dfngram,ngram)
+ dfngram<-mutate(dfngram,ngramtotal=sum(occurrences))
+ 
+#https://www.coursera.org/learn/data-science-project/module/VNKmf/discussions/HmPU3OvyEeWfwAohgaM63Q
+
 
 
 #tdm<- TermDocumentMatrix(corpora, control = list())

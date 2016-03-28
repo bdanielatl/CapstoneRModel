@@ -144,8 +144,13 @@ dfb<- bgf
 dftet<- tetgf
 
 dfngram<-bind_rows(dfu,dfb)%>%bind_rows(dft)%>%bind_rows(dftet)
-dfngram<-dfngram %>% group_by(source) %>% mutate(ngramtotal=sum(occurrences))
+dfngram<-dfngram %>% group_by(source) %>% mutate(ngramtotal=sum(occurrences)) %>%
+        mutate(pngram=occurrences/ngramtotal)
 
+filterNGrams<-function(x=""){
+        return(filter(dfngram,term==x))
+        
+}
 
 stupidBackOff<- function(testGram="case of",weights=length(strsplit(testGram,' ')[[1]])){
         #take the last three words of the testGram
@@ -162,11 +167,25 @@ stupidBackOff<- function(testGram="case of",weights=length(strsplit(testGram,' '
                xdf<-cbind(xdf,x = word(xdf$term,start=-i,end=-1))
                
         }
+        #loop over all columns xdf[ncol(xdf)-1]
+        for(i in xl:1){
+                #xdf[ncol(xdf)-i+1]
+                # l<-apply(mydf[ncol(mydf)-i+1],1,function(params)filterNGrams(params[1]))
+                # my.matrix<-do.call("rbind", l)
+                # xdf<-cbind(xdf,as.data.frame(my.matrix))
+        }
         return (xdf)
         
 }
 
 mydf<-stupidBackOff(testGram="case of")
+#mydf[ncol(mydf)-1+1]
+
+######THE KEY THAT MAKES THE RECURSIVE PROABABILITIES WORK####### <<<< work on this on Monday
+ l<-apply(mydf[ncol(mydf)-1+1],1,function(params)filterNGrams(params[1]))
+my.matrix<-do.call("rbind", l)
+#################################################################
+
 
   # dfngram<-mutate(dfngram,ngramtotal=sum(occurrences))%>%
   #         mutate(subject=word(term,-1))

@@ -12,7 +12,7 @@ library(tau)
 library(SnowballC)
 library(dplyr)
 library(stringi)
-
+library(stringr)
 #textAssociations is based off of the ExploratoryAnalysis.R file which I wrote for the second assignment.
 
 #get file if it does not already exist and unzip contents
@@ -83,7 +83,7 @@ createTextFrequencyDF <- function (corpustext,controlArg,source=""){
         #decreasing each item in matrix will be a word with a nubmer value 
         freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
         ord<-order(freq,decreasing=TRUE)
-        length(freq) #how many terms do I have (tell me the lengt)
+        #length(freq) #how many terms do I have (tell me the lengt)
         
         #build pareto analysis of the terms
         wf=data.frame(term=names(freq),
@@ -95,11 +95,11 @@ createTextFrequencyDF <- function (corpustext,controlArg,source=""){
 }
 
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.blogs.txt",startLine=startLine,
-                    readvector=500)
+                    readvector=1000)
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.twitter.txt",startLine=startLine,
-                    readvector=500)
+                    readvector=1000)
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.news.txt",startLine=startLine,
-                    readvector=500)
+                    readvector=1000)
 
 (corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
 
@@ -116,27 +116,61 @@ corpora<-tm_map(corpora,stripWhitespace)
 #nrow(docvars) == length(x) is not TRUE
 
  options(mc.cores=1)  #on MacOS you have to set the cores to single
- BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
- bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="All Docs")
-# 
- TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
- tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="All Docs")
+UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+ugf<-createTextFrequencyDF(controlArg =  list(tokenize = UnigramTokenizer),corpustext = corpora,source="unigram")
+ 
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="bigram")
 
- QuadgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
- qgf<-createTextFrequencyDF(controlArg =  list(tokenize =  QuadgramTokenizer),corpustext = corpora, source="All Docs")
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="trigram")
+
+TetgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
+tetgf<-createTextFrequencyDF(controlArg =  list(tokenize =  TetgramTokenizer),corpustext = corpora, source="tetragram")
+
+ 
 #
 #get the individual probablities of each quadgram and then 
 #multiply it by a lambda coefficient, then add them together.
  
- 
- dft<- mutate(tgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
- dfb<- mutate(bgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
- dfq<- mutate(qgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
- 
- dfngram<-bind_rows(dfb,dft) %>% bind_rows(dfq)
- dfngram<-group_by(dfngram,ngram)
- dfngram<-mutate(dfngram,ngramtotal=sum(occurrences))
- 
+# dfu<- mutate(ugf, ngram = term)
+# dft<- mutate(tgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
+# dfb<- mutate(bgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
+# dftet<- mutate(tetgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
+
+dfu<- ugf
+dft<- tgf
+dfb<- bgf
+dftet<- tetgf
+
+dfngram<-bind_rows(dfu,dfb)%>%bind_rows(dft)%>%bind_rows(dftet)
+dfngram<-dfngram %>% group_by(source) %>% mutate(ngramtotal=sum(occurrences))
+
+
+stupidBackOff<- function(testGram="case of",weights=length(strsplit(testGram,' ')[[1]])){
+        #take the last three words of the testGram
+    
+        xl<-length(strsplit(testGram,' ')[[1]])
+        #extracted data frame
+        
+        xdf<-filter(dfngram,grepl(paste0("^",testGram,"\\s\\w+$"),term))
+        #xdf<-filter(dfngram,grepl(paste0("^","case of\\s\\w+$"),term))
+        nmvctor<-letters
+        
+        
+        for (i in xl:1){
+               xdf<-cbind(xdf,x = word(xdf$term,start=-i,end=-1))
+               
+        }
+        return (xdf)
+        
+}
+
+mydf<-stupidBackOff(testGram="case of")
+
+  # dfngram<-mutate(dfngram,ngramtotal=sum(occurrences))%>%
+  #         mutate(subject=word(term,-1))
+  # 
 #https://www.coursera.org/learn/data-science-project/module/VNKmf/discussions/HmPU3OvyEeWfwAohgaM63Q
 
 

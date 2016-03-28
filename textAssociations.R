@@ -160,22 +160,23 @@ stupidBackOff<- function(testGram="case of",weights=length(strsplit(testGram,' '
         
         xdf<-filter(dfngram,grepl(paste0("^",testGram,"\\s\\w+$"),term))
         #xdf<-filter(dfngram,grepl(paste0("^","case of\\s\\w+$"),term))
-        nmvctor<-letters
-        
+
         
         for (i in xl:1){
                xdf<-cbind(xdf,x = word(xdf$term,start=-i,end=-1))
                
         }
+        
         #loop over all columns xdf[ncol(xdf)-1]
-        for(i in xl:1){
-                #xdf[ncol(xdf)-i+1]
-                # l<-apply(mydf[ncol(mydf)-i+1],1,function(params)filterNGrams(params[1]))
-                # my.matrix<-do.call("rbind", l)
-                # xdf<-cbind(xdf,as.data.frame(my.matrix))
+        ##this worked!
+        for(i in 5:6+xl-1){
+                
+                 l<-apply(xdf[i],1,function(params)filterNGrams(params[1]))
+                 my.matrix<-do.call("rbind", l)
+                 xdf<-cbind(xdf,as.data.frame(my.matrix))
         }
         return (xdf)
-        
+        ##############
 }
 
 mydf<-stupidBackOff(testGram="case of")

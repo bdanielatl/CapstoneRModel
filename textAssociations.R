@@ -76,15 +76,23 @@ sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt"
 }
 
 createTextFrequencyDF <- function (corpustext,controlArg,source=""){
-        
-        #create a document term matrix from the corpora for analysis
-        dtm<-DocumentTermMatrix(corpustext,control=controlArg)
-        #create a matrix and sort it 
-        #decreasing each item in matrix will be a word with a nubmer value 
-        freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
-        ord<-order(freq,decreasing=TRUE)
-        #length(freq) #how many terms do I have (tell me the lengt)
-        
+        if(is.null(controlArg)){
+                dtm<-DocumentTermMatrix(corpustext)
+                #create a matrix and sort it 
+                #decreasing each item in matrix will be a word with a nubmer value 
+                freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
+                ord<-order(freq,decreasing=TRUE)
+        }
+        else{
+                #create a document term matrix from the corpora for analysis
+                dtm<-DocumentTermMatrix(corpustext,control=controlArg)
+                #create a matrix and sort it 
+                #decreasing each item in matrix will be a word with a nubmer value 
+                freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
+                ord<-order(freq,decreasing=TRUE)
+                #length(freq) #how many terms do I have (tell me the lengt)
+        }
+
         #build pareto analysis of the terms
         wf=data.frame(term=names(freq),
                       occurrences=freq,
@@ -95,11 +103,11 @@ createTextFrequencyDF <- function (corpustext,controlArg,source=""){
 }
 
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.blogs.txt",startLine=startLine,
-                    readvector=1000)
+                    readvector=10000)
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.twitter.txt",startLine=startLine,
-                    readvector=1000)
+                    readvector=10000)
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.news.txt",startLine=startLine,
-                    readvector=1000)
+                    readvector=10000)
 
 (corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
 
@@ -115,9 +123,9 @@ corpora<-tm_map(corpora,stripWhitespace)
 #myCorpus <- corpus(corpora) #trying to create a corpus object with quanteda, this is giving a bug
 #nrow(docvars) == length(x) is not TRUE
 
- options(mc.cores=1)  #on MacOS you have to set the cores to single
+options(mc.cores=1)  #on MacOS you have to set the cores to single
 UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
-ugf<-createTextFrequencyDF(controlArg =  list(tokenize = UnigramTokenizer),corpustext = corpora,source="unigram")
+ugf<-createTextFrequencyDF(controlArg =  NULL,corpustext = corpora,source="unigram")
  
 BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
 bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="bigram")
@@ -128,7 +136,6 @@ tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpu
 TetgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
 tetgf<-createTextFrequencyDF(controlArg =  list(tokenize =  TetgramTokenizer),corpustext = corpora, source="tetragram")
 
- 
 #
 #get the individual probablities of each quadgram and then 
 #multiply it by a lambda coefficient, then add them together.
@@ -152,39 +159,65 @@ filterNGrams<-function(x=""){
         
 }
 
+
+
+
 stupidBackOff<- function(testGram="case of",weights=length(strsplit(testGram,' ')[[1]])){
         #take the last three words of the testGram
     
         xl<-length(strsplit(testGram,' ')[[1]])
         #extracted data frame
         
-        xdf<-filter(dfngram,grepl(paste0("^",testGram,"\\s\\w+$"),term))
-        #xdf<-filter(dfngram,grepl(paste0("^","case of\\s\\w+$"),term))
-
+        #xdf<-filter(dfngram,grepl(paste0("^",testGram,"\\s\\w+$"),term))
+        xdf<-dfngram
         
-        for (i in xl:1){
-               xdf<-cbind(xdf,x = word(xdf$term,start=-i,end=-1))
+        xdfcn<-colnames(xdf)
+        
+        for (i in 2:1){
+               xdf<-cbind(xdf,x= word(xdf$term,start=-i,end=-1))
+               xdfcn<-c(xdfcn,i)
                
         }
+       if(ncol(xdf) == 7){
+               colnames(xdf)[6]<-"x"
+               colnames(xdf)[7]<-"y"
+       }
         
-        #loop over all columns xdf[ncol(xdf)-1]
-        ##this worked!
-        for(i in 5:6+xl-1){
+       
+       
+        if(ncol(xdf)==7)
+        {
+                l<-apply(xdf[6],1,function(params)filterNGrams(params[1]))
+                my.matrix<-do.call("rbind", l)
+                t3<-(as.data.frame(my.matrix,stringsAsFactors = FALSE)) 
                 
-                 l<-apply(xdf[i],1,function(params)filterNGrams(params[1]))
-                 my.matrix<-do.call("rbind", l)
-                 xdf<-cbind(xdf,as.data.frame(my.matrix))
+                l<-apply(xdf[7],1,function(params)filterNGrams(params[1]))
+                my.matrix<-do.call("rbind", l)
+                 t2<-(as.data.frame(my.matrix,stringsAsFactors = FALSE)) 
+                 
+                 xdf<-left_join(xdf, t3, by = c("x" = "term"))
+                 xdf<-left_join(xdf,t2,by= c( "y" = "term"))
+                 
         }
+        else if (ncol(xdf)==6)
+        {
+                l<-apply(xdf[6],1,function(params)filterNGrams(params[1]))
+                 my.matrix<-do.call("rbind", l)
+                 t2<-(as.data.frame(my.matrix,stringsAsFactors = FALSE)) 
+                 xdf<-left_join(xdf,t2,by= c( "x" = "term"))
+        }
+        
+     
         return (xdf)
         ##############
 }
 
-mydf<-stupidBackOff(testGram="case of")
+align<-stupidBackOff()
 #mydf[ncol(mydf)-1+1]
 
 ######THE KEY THAT MAKES THE RECURSIVE PROABABILITIES WORK####### <<<< work on this on Monday
- l<-apply(mydf[ncol(mydf)-1+1],1,function(params)filterNGrams(params[1]))
-my.matrix<-do.call("rbind", l)
+#  l<-apply(mydf[ncol(mydf)-1+1],1,function(params)filterNGrams(params[1]))
+# my.matrix<-do.call("rbind", l)
 #################################################################
 
 

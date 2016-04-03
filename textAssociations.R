@@ -194,6 +194,12 @@ buildProbabilityTable<-function(testGram="case of",ngframe = NULL){
         dfuResult<-left_join(dftgram,dfbgram,by=c("key"="term"))
         dfuResult$uKey <- word(dftgram$term,-1,-1)
         dfuResult<-left_join(dfuResult,dfugram, by=c("uKey" = "term"))
+        
+        #group by bigram and sum,
+        bgsum<<-group_by(dfuResult, source.y) %>% summarise(bigramsum=sum(tgsum.y))
+        ugsum<<-group_by(dfuResult, source) %>% summarise(unigramsum=sum(tgsum))
+        dfuResult<<-cbind(dfuResult,bigramsum=bgsum$bigramsum)%>%cbind(unigramsum=ugsum$unigramsum)
+        #dfuResult2<<-cbind(dfuResult,unigramsum=ugsum$unigramsum)
 }
 
 

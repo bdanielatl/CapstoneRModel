@@ -221,6 +221,10 @@ filterNGrams<-function(x="",ngDataFrame=NULL){
        # return(filter(ngDataFrame,term==x))
         return(filter(ngDataFrame,term==x)$term)
 }
+
+#call to the result table for doing the model
+cbind(dfuResult$term, (dfuResult$occurrences.x/dfuResult$tgsum.x)*.5+(dfuResult$occurrences.y/dfuResult$bigramsum)*.3+(dfuResult$occurrences/dfuResult$unigramsum)*.2)
+
 #
 #get the individual probablities of each quadgram and then 
 #multiply it by a lambda coefficient, then add them together.

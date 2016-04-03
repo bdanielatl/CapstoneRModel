@@ -75,7 +75,7 @@ sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt"
         write.table(txtR,paste0("temp/",strsplit(dataSourcePath,"/")[[1]][4]),col.names=FALSE)
 }
 
-createTextFrequencyDF <- function (corpustext,controlArg,source=""){
+createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDataFrame=TRUE){
         if(is.null(controlArg)){
                 dtm<-DocumentTermMatrix(corpustext)
                 #create a matrix and sort it 
@@ -92,15 +92,25 @@ createTextFrequencyDF <- function (corpustext,controlArg,source=""){
                 ord<-order(freq,decreasing=TRUE)
                 #length(freq) #how many terms do I have (tell me the lengt)
         }
-
-        #build pareto analysis of the terms
-        wf=data.frame(term=names(freq),
-                      occurrences=freq,
-                      #cumfreqpct=cumsum((freq/sum(freq))*100),
-                      source=source,stringsAsFactors = FALSE
-        )
-        return (wf)
+        
+        if(transformToDataFrame==TRUE)
+        {
+                #build pareto analysis of the terms
+                wf=data.frame(term=names(freq),
+                              occurrences=freq,
+                              #cumfreqpct=cumsum((freq/sum(freq))*100),
+                              source=source,stringsAsFactors = FALSE
+                )
+                return (wf)
+        }
+        else{
+                return (dtm)
+        }
+        
+        
 }
+
+
 
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.blogs.txt",startLine=startLine,
                     readvector=10000)
@@ -125,17 +135,86 @@ corpora<-tm_map(corpora,stripWhitespace)
 
 options(mc.cores=1)  #on MacOS you have to set the cores to single
 UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
-ugf<-createTextFrequencyDF(controlArg =  NULL,corpustext = corpora,source="unigram")
+ugf<-createTextFrequencyDF(controlArg =  NULL,corpustext = corpora,source="unigram",transformToDataFrame = TRUE)
  
 BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
-bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="bigram")
+bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="bigram",transformToDataFrame = TRUE)
 
 TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
-tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="trigram")
+tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="trigram",transformToDataFrame = TRUE)
 
 TetgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
-tetgf<-createTextFrequencyDF(controlArg =  list(tokenize =  TetgramTokenizer),corpustext = corpora, source="tetragram")
+tetgf<-createTextFrequencyDF(controlArg =  list(tokenize =  TetgramTokenizer),corpustext = corpora, source="tetragram",transformToDataFrame = TRUE)
 
+
+buildProbabilityTable<-function(testGram="case of",ngframe = NULL){
+        #find probability of the testGram (a bigram) within the trigram
+        dftgram <<- getMyWordProbability(testGram =testGram,ngframe=tgf,regexpr="regex"  )
+        #build a list of the bigrams within the trigram set
+        l<<-apply(dftgram[1],1,
+                 function(params)
+                         filterNGrams(x=(word(params[1],-2,-1)),
+                                      ngDataFrame=bgf)
+        )
+  
+        #find the probability of the bigram on the end of each located trigram
+        #this is a list of data frames, each frame must be extracted as a row and appended
+        dfbgram<<-apply(as.data.frame(l),1,function(params)getMyWordProbability(testGram=params[1],ngframe=bgf,regexpr="nonreg"))
+        df<-NULL
+        for(e in 1:length(dfbgram)) rbind(df,data.frame(term=dfbgram[[e]]$term,
+                                                        occurrences = dfbgram[[e]]$occurrences,
+                                                        source= dfbgram[[e]]$source,
+                                                        tgsum = dfbgram[[e]]$tgsum),stringsAsFactors=FALSE)->df
+        dfbgram<<-df
+        
+        # get the last word of each bigram and then find its probability in the unigram set
+         l<<-apply(dfbgram[1],1,
+                  function(params)
+                          filterNGrams(x=(word(params[1],-1,-1)),
+                                       ngDataFrame=ugf)
+        )
+
+         dfugram<<-apply(as.data.frame(l),1,function(params)getMyWordProbability(testGram=params[1],ngframe=ugf,regexpr="nonreg"))
+        # 
+        df<-NULL
+        for(e in 1:length(dfugram)) rbind(df,as.data.frame(data.frame(term=dfugram[[e]]$term,
+                                                        occurrences = dfugram[[e]]$occurrences,
+                                                        source= dfugram[[e]]$source,
+                                                        tgsum = dfugram[[e]]$tgsum)),stringsAsFactors=FALSE)->df
+      
+        dfugram<<-df
+        dfugram$term<- as.character(dfugram$term)
+        #all word tables have been assembled merge them together into one table 
+        # dfuResult<-rbind(dftgram, dfbgram)
+        # dfuResult<-rbind(dfuResult,dfugram)
+        dftgram$key<-word(dftgram$term,-2,-1) #get the bigram
+        dfbgram$term <-as.character(dfbgram$term)
+        
+        
+        dfuResult<-left_join(dftgram,dfbgram,by=c("key"="term"))
+        dfuResult$uKey <- word(dftgram$term,-1,-1)
+        dfuResult<-left_join(dfuResult,dfugram, by=c("uKey" = "term"))
+}
+
+
+getMyWordProbability<-function(testGram="case of",ngframe=NULL,regexpr="regex"){
+        #trigram probabilitiy
+        if(regexpr == "regex"){
+                df1<-filter(ngframe, grepl(paste0("^",testGram),term))  
+        }
+        else{
+                df1<-filter(ngframe,term==testGram)       
+        }
+       
+        df1<-cbind(df1,tgsum = sum(df1$occurrences))
+ 
+}
+
+filterNGrams<-function(x="",ngDataFrame=NULL){
+       # print(x)
+       # return(filter(ngDataFrame,term==x))
+        return(filter(ngDataFrame,term==x)$term)
+}
 #
 #get the individual probablities of each quadgram and then 
 #multiply it by a lambda coefficient, then add them together.
@@ -145,74 +224,13 @@ tetgf<-createTextFrequencyDF(controlArg =  list(tokenize =  TetgramTokenizer),co
 # dfb<- mutate(bgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
 # dftet<- mutate(tetgf, ngram = substr(term,start=1,stop=stri_locate_last_regex(term,"\\s")-1))
 
-dfu<- ugf
-dft<- tgf
-dfb<- bgf
-dftet<- tetgf
-
-dfngram<-bind_rows(dfu,dfb)%>%bind_rows(dft)%>%bind_rows(dftet)
-dfngram<-dfngram %>% group_by(source) %>% mutate(ngramtotal=sum(occurrences)) %>%
-        mutate(pngram=occurrences/ngramtotal)
-
-filterNGrams<-function(x=""){
-        return(filter(dfngram,term==x))
-        
-}
 
 
 
 
-stupidBackOff<- function(testGram="case of",weights=length(strsplit(testGram,' ')[[1]])){
-        #take the last three words of the testGram
-    
-        xl<-length(strsplit(testGram,' ')[[1]])
-        #extracted data frame
-        
-        #xdf<-filter(dfngram,grepl(paste0("^",testGram,"\\s\\w+$"),term))
-        xdf<-dfngram
-        
-        xdfcn<-colnames(xdf)
-        
-        for (i in 2:1){
-               xdf<-cbind(xdf,x= word(xdf$term,start=-i,end=-1))
-               xdfcn<-c(xdfcn,i)
-               
-        }
-       if(ncol(xdf) == 7){
-               colnames(xdf)[6]<-"x"
-               colnames(xdf)[7]<-"y"
-       }
-        
-       
-       
-        if(ncol(xdf)==7)
-        {
-                l<-apply(xdf[6],1,function(params)filterNGrams(params[1]))
-                my.matrix<-do.call("rbind", l)
-                t3<-(as.data.frame(my.matrix,stringsAsFactors = FALSE)) 
-                
-                l<-apply(xdf[7],1,function(params)filterNGrams(params[1]))
-                my.matrix<-do.call("rbind", l)
-                 t2<-(as.data.frame(my.matrix,stringsAsFactors = FALSE)) 
-                 
-                 xdf<-left_join(xdf, t3, by = c("x" = "term"))
-                 xdf<-left_join(xdf,t2,by= c( "y" = "term"))
-                 
-        }
-        else if (ncol(xdf)==6)
-        {
-                l<-apply(xdf[6],1,function(params)filterNGrams(params[1]))
-                 my.matrix<-do.call("rbind", l)
-                 t2<-(as.data.frame(my.matrix,stringsAsFactors = FALSE)) 
-                 xdf<-left_join(xdf,t2,by= c( "x" = "term"))
-        }
-        
-     
-        return (xdf)
-        ##############
-}
 
-align<-stupidBackOff()
+
+
 #mydf[ncol(mydf)-1+1]
 
 ######THE KEY THAT MAKES THE RECURSIVE PROABABILITIES WORK####### <<<< work on this on Monday

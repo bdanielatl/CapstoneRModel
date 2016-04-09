@@ -31,12 +31,12 @@ buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
         #find the probability of the bigram on the end of each located trigram
         #this is a list of data frames, each frame must be extracted as a row and appended
         dfbgram<<-apply(as.data.frame(l),1,function(params)getMyWordProbability(testGram=params[1],ngframe=bgf,regexpr="nonreg"))
-        df<-NULL
-        for(e in 1:length(dfbgram)) rbind(df,data.frame(term=dfbgram[[e]]$term,
+        dft<-NULL
+        for(e in 1:length(dfbgram)) rbind(dft,data.frame(term=dfbgram[[e]]$term,
                                                         occurrences = dfbgram[[e]]$occurrences,
                                                         source= dfbgram[[e]]$source,
-                                                        tgsum = dfbgram[[e]]$tgsum),stringsAsFactors=FALSE)->df
-        dfbgram<<-df
+                                                        tgsum = dfbgram[[e]]$tgsum),stringsAsFactors=FALSE)->dft
+        dfbgram<<-dft
         
          
         ## get the last word of each bigram and then find its probability in the unigram set
@@ -49,6 +49,7 @@ buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
         #
        
         #getting the unitgram
+        
         dfugram<<-apply(data.frame(unlist(l),stringsAsFactors = FALSE),1,function(params)getMyWordProbability(testGram=params[1],ngframe=ugf,regexpr="nonreg"))
         
         dft<-NULL
@@ -70,21 +71,26 @@ buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
         dfuResult<<-left_join(dftgram,dfbgram,by=c("key"="term"))
         dfuResult$uKey <- word(dftgram$term,-1,-1)
         
-        dfuResult<<-left_join(dfuResult,dfugram, by=c("uKey" = "term"))
+
+ 
         
+        dfuResult2<<-left_join(dfuResult,dfugram, by=c("uKey" = "term"))
+
         #group by bigram and sum,
         #first remove all incomplete cases
-        dfuResult<<-dfuResult[complete.cases(dfuResult),]
 
-        
-          bgsum<<-group_by(dfuResult, source.y) %>% summarise(bigramsum=sum(tgsum.y))
-        #  ugsum<<-group_by(dfuResult, source) %>% summarise(unigramsum=sum(tgsum))
-        #  dfuResult<<-cbind(dfuResult,bigramsum=bgsum$bigramsum)%>%cbind(unigramsum=ugsum$unigramsum)
-                
+        dfuResult2<<-dfuResult2[complete.cases(dfuResult2),]
+          bgsum<<-group_by(dfuResult2, source.y) %>% summarise(bigramsum=sum(tgsum.y))
+          ugsum<<-group_by(dfuResult2, source) %>% summarise(unigramsum=sum(tgsum))
+          dfuResult2<<-cbind(dfuResult2,bigramsum=bgsum$bigramsum)%>%cbind(unigramsum=ugsum$unigramsum)
+             
+                 
 }
 
 buildProbabilityTable()
 #call to the result table for doing the model
 
-        as.data.frame(dfuResult$term, (dfuResult$occurrences.x/dfuResult$tgsum.x)*.5+(dfuResult$occurrences.y/dfuResult$bigramsum)*.3+(dfuResult$occurrences/dfuResult$unigramsum)*.2, stringsAsFactors = FALSE)
+        drR<-data.frame(term=dfuResult2$term, prob_result=(dfuResult2$occurrences.x/dfuResult2$tgsum.x)*.5+
+                        (dfuResult2$occurrences.y/dfuResult2$bigramsum)*.3+
+                        (dfuResult2$occurrences/dfuResult2$unigramsum)*.2) %>% arrange(desc(prob_result))
 

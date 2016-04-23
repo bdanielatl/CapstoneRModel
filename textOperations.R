@@ -90,7 +90,18 @@ buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
 buildProbabilityTable()
 #call to the result table for doing the model
 
-        drR<-data.frame(term=dfuResult2$term, prob_result=(dfuResult2$occurrences.x/dfuResult2$tgsum.x)*.5+
+        drR<-data.frame(term=dfuResult2$term, prob_result=(dfuResult2$occurrences.x/dfuResult2$tgsum.x)*.6+
                         (dfuResult2$occurrences.y/dfuResult2$bigramsum)*.3+
-                        (dfuResult2$occurrences/dfuResult2$unigramsum)*.2) %>% arrange(desc(prob_result))
+                        (dfuResult2$occurrences/dfuResult2$unigramsum)*.1) %>% arrange(desc(prob_result))
 
+        # drR<-data.frame(term=dfuResult2$term,
+        #                 prob_result=(dfuResult2$occurrences.x/dfuResult2$tgsum.x)/(dfuResult2$tgsum.y/dfuResult2$bigramsum)
+        #                 )
+        
+        #count of trigram / count of bigram
+        drR<-data.frame(term=dfuResult2$term,
+                                         tgram_prob=(dfuResult2$occurrences.x/dfuResult2$occurrences.y)
+                                        
+                                         )%>%arrange(desc(tgram_prob))     
+        
+        

@@ -9,7 +9,7 @@ library(RWeka)
 library(slam)
 library(tau)
 library(SnowballC)
-
+library(dplyr)
 
 #get file if it does not already exist and unzip contents
 fileName <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
@@ -79,7 +79,7 @@ sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt"
         
         close(con) #done reading lines, now write lines
 
-        #write.table(df,paste0("temp/",strsplit(dataSourcePath,"/")[[1]][4]),col.names=FALSE)
+        # write the text to a file; the [[1]][[4]] gets the file name of the original document
         write.table(txtR,paste0("temp/",strsplit(dataSourcePath,"/")[[1]][4]),col.names=FALSE)
 
 }
@@ -130,15 +130,6 @@ createTextFrequencyDF <- function (corpustext,controlArg,source=""){
 #https://eight2late.wordpress.com/2015/05/27/a-gentle-introduction-to-text-mining-using-r/
 
 wf<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)),corpustext = copora)
-
-# Sets the default number of threads to use
-options(mc.cores=1)  #on MacOS you have to set the cores to single
-BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
-bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = copora)
-
-TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
-tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = copora)
-
 #compare twitter versus blogs word frequency
 wfx<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)),
                            corpustext = copora[1], 
@@ -148,6 +139,15 @@ wfx<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)),
 wfx<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)),
                            corpustext = copora[2], 
                            source = copora[[2]]$meta$id)
+
+# Sets the default number of threads to use
+options(mc.cores=1)  #on MacOS you have to set the cores to single
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = copora)
+
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = copora)
+
 
 
 #create a data frame with one column for source

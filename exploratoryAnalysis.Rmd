@@ -1,5 +1,5 @@
 ---
-title: "Exploratory Analysis of Copora for Text Mining"
+title: "Exploratory Analysis of Corpora for Text Mining"
 author: "Ben Daniel"
 date: "March 15, 2016"
 output: html_document
@@ -14,13 +14,17 @@ library(RTextTools)
 library(RWeka)
 library(slam)
 library(SnowballC)
+library(dplyr)
+library(knitr)
+
+startLine <- 1
 ```
 # Introduction
 Text Mining and Predictive Text Analytics are interesting areas of study and application in the modern world of data science.  Their applications are numerous including forensics, marketing, and customer relationship management.  Even mobile devices leverage text mining as keyboards predict the word a user is about to type in order to improve text entry.
 
 The Capstone Project for the Data Science Certificate offered by Johns Hopkins University requires students to write a prediction model for text using the principles learned in the certification courses. This report is an analysis of the corpora (the text samples) given for building the prediction algorithm.  It will suvery the documents, provide summary information about them and discuss intersting findings.  Additionally, it will cover the sampling and modeling strategy to complete the modeling assignment.
 
-```{r echo=FALSE}
+```{r loadtext, echo=FALSE}
         #get file if it does not already exist and unzip contents
         fileName <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
         destFile <- "data/Coursera-SwiftKey.zip"
@@ -52,10 +56,159 @@ The Capstone Project for the Data Science Certificate offered by Johns Hopkins U
         close(con_bw)
         
         #load data
-(copora <- VCorpus(DirSource("data/final/en_US/"),readerControl=list(language="en")))
+corpora <- VCorpus(DirSource("data/final/en_US/"),readerControl=list(language="en"))
 ```
 #Data Survey
-First, lets look at the data given to us.  Reading in the directory of text samples, we see the following:
-```{r echo=TRUE}
-metaCopora<-lapply(copora[1:length(copora)],meta)
+First, lets look at the data given to us.  After reading in the directory of text samples, loop over the documents and get their descriptions:
+```{r textsurvey, echo=TRUE}
+#get names of dcouments
+metaCopora<-lapply(corpora[1:length(corpora)],meta)
+print(metaCopora)
+#get their length in lines
+originalLengths<-lapply( lapply(corpora[1:length(corpora)],as.character) , length)
+print(originalLengths)
 ```
+The texts are too large to process and map in their entirety. Hence, we will sample the documents and write the output to a temp space.  Then we will re-read them and clean up the text by removing numbers, punctuation, stop-words, and profanity. We will then continue with the analysis.
+
+```{r sampletext, echo=TRUE}
+sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt",
+                               #where to start reading, pick a random spot and start reading
+                               startLine=sample(1:10000,size=1,replace=T), 
+                               #how many lines to read
+                               readvector=1000){
+        con<- file(dataSourcePath,open="r")
+
+        for(i in 1:startLine){
+                txtTmp<-readLines(con,1)
+        }
+        #now that the skip point has been reached, read the rest of the file
+        #read in the profanity filter
+
+        #newfile <- readLines(con)
+
+        #read vector //how many samples to use
+        rv<-readvector
+
+        #dataframe
+        df<-data.frame(txt=character())
+        #define function
+
+        txtR<-readLines(con,n=readvector,skipNul=TRUE)
+        
+        close(con) #done reading lines, now write lines
+
+        # write the text to a file; the [[1]][[4]] gets the file name of the original document
+        write.table(txtR,paste0("temp/",strsplit(dataSourcePath,"/")[[1]][4]),col.names=FALSE)
+
+}
+
+#read 50000 lines of text
+sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.blogs.txt",startLine=startLine,
+                    readvector=50000)
+sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.twitter.txt",startLine=startLine,
+                    readvector=50000)
+sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.news.txt",startLine=startLine,
+                    readvector=50000)
+
+(corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
+
+corpora<-tm_map(corpora,content_transformer(tolower))
+corpora<-tm_map(corpora,removeNumbers)
+corpora<-tm_map(corpora,removePunctuation)
+corpora<-tm_map(corpora, removeWords, stopwords("english"))
+corpora<-tm_map(corpora, removeWords, stopwords("SMART"))
+corpora<-tm_map(corpora,removeWords, profanity) #removeWords comes from the tm package
+corpora<-tm_map(corpora,stripWhitespace)
+corpora<-tm_map(corpora,stemDocument,lazy = TRUE)
+
+
+createTextFrequencyDF <- function (corpustext,controlArg,source=""){
+       
+        #create a document term matrix from the corpora for analysis
+        dtm<-DocumentTermMatrix(corpustext,control=controlArg)
+        #create a matrix and sort it 
+        #decreasing each item in matrix will be a word with a nubmer value 
+        freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
+        ord<-order(freq,decreasing=TRUE)
+        length(freq) #how many terms do I have (tell me the lengt)
+        
+        #build pareto analysis of the terms
+        wf=data.frame(term=names(freq),
+                      occurrences=freq,
+                      cumfreqpct=cumsum((freq/sum(freq))*100),
+                      source=source
+        )
+        return (wf)
+}
+
+```
+##Summary Statistics
+Looking over all three documents in the corpora, the following table shows the top 25 most frequent words
+```{r textsummary}
+wf_master<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)),corpustext = corpora,source="All Docs")
+wfstat<-slice(wf_master,1:25) #top 25
+kable(wfstat,digits=1)
+
+```
+
+From this table, we can see that the top 25 terms make up about 8% of the most frequently used words.
+
+Now let's look at an bi-gram and tri-gram analysis to see what word pairs occur most frequently.
+```{r textsummaryngram}
+
+options(mc.cores=1)  #on MacOS you have to set the cores to single
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+bgf<-slice(createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="All Docs"),1:25)
+
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+tgf<-slice(createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="All Docs"),1:25)
+```
+The top 25 word pairs
+`r kable(bgf)`
+The top 25 word triplets
+`r kable(tgf)`
+
+Looking at this from a Pareto perspective, how many words does it take to get to 90%?
+
+It takes me approximately `r nrow(filter(wf_master,cumfreqpct <= 90))` rows to get t 90%, which is  `r round(nrow(filter(wf_master,cumfreqpct <= 90))/nrow(wf_master)*100,2)` percent of the entire sampled corpus.
+
+```{r plotwordfreq, echo=FALSE}
+
+library(ggplot2)
+p <- ggplot(wfstat, aes(x=reorder(term,-occurrences,sum), occurrences))
+p <- p + geom_bar(stat="identity")
+p <- p + theme(axis.text.x=element_text(angle=45, hjust=1))
+p
+
+```
+
+##Analysis and Conclusions
+It's important that these different corpora are analyzed together for building the model.  Running the same analysis on them individually shows differences in their text profiles.  Look at `r corpora[[1]]$meta$id` versus `r corpora[[2]]$meta$id` to see which terms come to the top.
+###`r corpora[[1]]$meta$id`
+```{r echo=FALSE}
+#tabularize each of the documents
+wf<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)),corpustext = corpora[1],source=corpora[[1]]$meta$id)
+wfstat<-slice(wf,1:25)
+kable(wfstat,digits=1)
+```
+
+###`r corpora[[2]]$meta$id`
+```{r echo=FALSE}
+wf<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)),corpustext = corpora[2],source=corpora[[2]]$meta$id)
+wfstat<-slice(wf,1:25)
+kable(wfstat,digits=1)
+```
+###`r corpora[[3]]$meta$id`
+```{r echo=FALSE}
+wf<-createTextFrequencyDF(controlArg = list(wordLengths=c(4, 20)),corpustext = corpora[3],source=corpora[[3]]$meta$id)
+wfstat<-slice(wf,1:25)
+kable(wfstat,digits=1)
+```
+
+
+It is also important to notice the  difference in frequency percentages between 1, 2, and 3 n-gram tables.  The lower the ngram, the more frequent its occurrence.  As n-gram length grows, the top ranking n-gram frequency drops.  
+
+##Sampling and Model Building Strategy
+In this document, I applied sampling to start at a random place in each document and read for 50000 lines.  This was done to improve performance and render the report more quickly.  For building and testing the model, we will use a model building and hold out strategy.  60% of the data will be used to build the model.  Another 20% will be used to test the model and 20% will be used to validate it.
+
+

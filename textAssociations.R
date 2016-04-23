@@ -64,6 +64,7 @@ sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt"
 createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDataFrame=TRUE){
         if(is.null(controlArg)){
                 dtm<-DocumentTermMatrix(corpustext)
+                removeSparseTerms(dtm,.25)
                 #create a matrix and sort it 
                 #decreasing each item in matrix will be a word with a nubmer value 
                 freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
@@ -72,6 +73,7 @@ createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDa
         else{
                 #create a document term matrix from the corpora for analysis
                 dtm<-DocumentTermMatrix(corpustext,control=controlArg)
+                removeSparseTerms(dtm,.25)
                 #create a matrix and sort it 
                 #decreasing each item in matrix will be a word with a nubmer value 
                 freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
@@ -85,7 +87,7 @@ createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDa
                 wf=data.frame(term=names(freq),
                               occurrences=freq,
                               #cumfreqpct=cumsum((freq/sum(freq))*100),
-                              source=as.charcter(source),stringsAsFactors = FALSE
+                              source=as.character(source),stringsAsFactors = FALSE
                 )
                 wf$source = as.character(wf$source)
                 return (wf)
@@ -100,11 +102,11 @@ createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDa
 
 
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.blogs.txt",startLine=startLine,
-                    readvector=50000)
+                    readvector=40000)
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.twitter.txt",startLine=startLine,
-                    readvector=50000)
+                    readvector=40000)
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.news.txt",startLine=startLine,
-                    readvector=50000)
+                    readvector=40000)
 
 (corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
 
@@ -115,6 +117,7 @@ corpora<-tm_map(corpora,removePunctuation)
 #corpora<-tm_map(corpora, removeWords, stopwords("SMART"))
 corpora<-tm_map(corpora,removeWords, profanity) #removeWords comes from the tm package
 corpora<-tm_map(corpora,stripWhitespace)
+
 #corpora<-tm_map(corpora,stemDocument,lazy = TRUE)
 
 #myCorpus <- corpus(corpora) #trying to create a corpus object with quanteda, this is giving a bug

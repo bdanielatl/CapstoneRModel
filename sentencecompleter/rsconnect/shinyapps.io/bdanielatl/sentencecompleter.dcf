@@ -1,0 +1,9 @@
+name: sentencecompleter
+account: bdanielatl
+server: shinyapps.io
+appId: 97681
+bundleId: 432682
+url: https://bdanielatl.shinyapps.io/sentencecompleter/
+when: 1461540275.24938
+asMultiple: FALSE
+asStatic: FALSE

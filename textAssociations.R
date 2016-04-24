@@ -33,32 +33,24 @@ close(con_bw)
 
 startLine <- 1
 
-sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt",
-                               startLine=sample(1:10000,size=1,replace=T),
-                               readvector=1000){
-        con<- file(dataSourcePath,open="r")
+#read all three documents into memory random sample 1% of lines
+sampleAndWriteTexts<- function(dataSourcePath="data/final/en_US/en_US.blogs.txt"){
         
-        for(i in 1:startLine){
-                txtTmp<-readLines(con,1)
+        if(!file.exists(paste0("temp/",strsplit(dataSourcePath,"/")[[1]][4]))){
+                ##read in the entire file and count the number of lines
+                con<- file(dataSourcePath,open="r")
+                
+                fileLines<<-readLines(con)
+                close(con)
+                numLines<-length(fileLines)
+                sampleLines<-numLines*.02 #use 2% of the file to train
+                #sampleVector<-sample(1:numLines,round(sampleLines,0),replace=TRUE)
+                
+                writeLines(sample_lines(filename=dataSourcePath,sampleLines,nlines=numLines),
+                           con=paste0("temp/",strsplit(dataSourcePath,"/")[[1]][4]))
         }
-        #now that the skip point has been reached, read the rest of the file
-        #read in the profanity filter
         
-        #newfile <- readLines(con)
         
-        #read vector //how many samples to use
-        rv<-readvector
-        
-        #dataframe
-        df<-data.frame(txt=character())
-        #define function
-        
-        txtR<-readLines(con,n=readvector,skipNul=TRUE)
-        
-        close(con) #done reading lines, now write lines
-        
-        # write the text to a file; the [[1]][[4]] gets the file name of the original document
-        write.table(txtR,paste0("temp/",strsplit(dataSourcePath,"/")[[1]][4]),col.names=FALSE)
 }
 
 createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDataFrame=TRUE){
@@ -101,12 +93,9 @@ createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDa
 
 
 
-sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.blogs.txt",startLine=startLine,
-                    readvector=40000)
-sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.twitter.txt",startLine=startLine,
-                    readvector=40000)
-sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.news.txt",startLine=startLine,
-                    readvector=40000)
+sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.blogs.txt")
+sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.twitter.txt")
+sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.news.txt")
 
 (corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
 
@@ -136,8 +125,6 @@ tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpu
 
 TetgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
 tetgf<-createTextFrequencyDF(controlArg =  list(tokenize =  TetgramTokenizer),corpustext = corpora, source="tetragram",transformToDataFrame = TRUE)
-
-
 
 
 getMyWordProbability<-function(testGram="case of",ngframe=NULL,regexpr="regex"){

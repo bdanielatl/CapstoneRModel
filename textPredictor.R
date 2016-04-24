@@ -1,20 +1,20 @@
 #read in the english files into objects
 #requuire the tm library
-library(NLP)
+#library(NLP)
 library(tm)
 library(LaF)
-library(reader)
+#library(reader)
 #library(wordcloud)
-library(RTextTools)
+#library(RTextTools)
 library(RWeka)
-library(slam)
-library(tau)
-library(SnowballC)
+#library(slam)
+#library(tau)
+#library(SnowballC)
 library(dplyr)
-library(stringi)
+#library(stringi)
 library(stringr)
-
-
+#library(data.table)
+library(filehash)
 set.seed(23456)
 
 source(file="textPredictorLib.R")
@@ -26,7 +26,7 @@ sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.news.txt")
 sampleAndWriteTexts(dataSourcePath="data/final/en_US/en_US.twitter.txt")
 
 #build the coprpus
-(corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
+corpora <- PCorpus(DirSource("temp/"),readerControl=list(reader=readPlain),dbControl=list(useDB=TRUE,dbName="./trainDB",dbType="DB1"))
 corpora<-tm_map(corpora,content_transformer(tolower))
 corpora<-tm_map(corpora,removeNumbers)
 corpora<-tm_map(corpora,removePunctuation)
@@ -34,10 +34,11 @@ corpora<-tm_map(corpora,removePunctuation)
 #corpora<-tm_map(corpora, removeWords, stopwords("SMART"))
 corpora<-tm_map(corpora,removeWords, profanity) #removeWords comes from the tm package
 corpora<-tm_map(corpora,stripWhitespace)
-
+corpora<-tm_map(corpora,PlainTextDocument)
 #create the tokenizers
 
-UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+
+UnigramTokenizer <- function(x) RWeka::NGramTokenizer(x, RWeka::Weka_control(min = 1, max = 1)) 
 BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
 TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
 #process unigrams
@@ -112,16 +113,22 @@ predictKN <- function(input,maxResult = 3){
         
          cp<<- unique(subbi$word)
          pkn<<-rep(NA,length(cp))
-        # for(i in 1:length(cp)){
-        #         nw3<<- sum(grepl(cp[i],wf_B$word))
-        #         nw2w3<<-sum(grepl(paste0(input2,'',cp[i],'$'),wf_T$word))
-        #         cw1w2w3 <<- subtri[subtri$start == cp[i],2]
-        #         pkn[i]<<-max((cw1w2w3-D3),0)/cw1w2 + p3*(max((nw2w3-D3),0)/W2+p2*nw3)
-        # }
+         nw3df<<-subbi%>%group_by(word)%>%summarize(nw3c=sum(count))
+         #nw2w3df<-wf_T%>%filter(start=="of")%>%group_by(word)
+         #build up a list of the words in to a regular expression
+         
+         #nw2w3df<-wf_T%>%filter(grepl(past))
+         # for(i in 1:length(cp)){
+         #        print(i)
+         #         nw3<<- sum(grepl(cp[i],wf_B$word))
+         #         nw2w3<<-sum(grepl(paste0(input2,'',cp[i],'$'),wf_T$word))
+         #         cw1w2w3 <<- subtri[subtri$start == cp[i],2]
+         #         pkn[i]<<-max((cw1w2w3-D3),0)/cw1w2 + p3*(max((nw2w3-D3),0)/W2+p2*nw3)
+         # }
         # 
-        # predictWord<<-data.frame(next_word = cp, probability = pkn, stringsAsFactors = FALSE)
+         #predictWord<<-data.frame(next_word = cp, probability = pkn, stringsAsFactors = FALSE)
         # predictWord<<-predictWord[order(predictWord$probability, decreasing= T), ]
-        # return(predictWord)
+         #return(predictWord)
 }
 
 df<-predictKN(input="case of")

@@ -40,6 +40,7 @@ shinyServer(function(input, output) {
                 
                 
                 sl <- unlist(str_split(input$phraseInput," "))
+                
                 if(length(sl) < 2){
                         #message : phrase too short
                         output$txtRestate <- renderText({
@@ -51,12 +52,13 @@ shinyServer(function(input, output) {
                         return("")
                 }   
                 testGram<- paste(sl[length(sl)-1],sl[length(sl)])
-                printedPrediction <- tryCatch(
-                        {
+                print("printing testgram")
+                print(testGram)
                                 progress$set(message = "Predicting new phrase", value = 0)
                                 
+                                print("predicting sentence")
                                 drR<-predictSentence(myinput= testGram)
-                                
+                                print("sentence predicted")
                                 #get the first row of drR
                                 output$txtRestate <- renderText({
                                         paste0("The tested phrase is", testGram,".")
@@ -64,23 +66,43 @@ shinyServer(function(input, output) {
                                 output$txtPredictedPhrase<- renderText({
                                         paste0("The predicted phrase is", testGram,".")
                                 })
-                                
+
                                 output$mytable = renderDataTable({
                                         top_n(drR,10,prob_result)
                                 })
-                                
-                        }, error = function(err){
-                                #print to the screen that the phrase cannot be predicted
-                                output$txtRestate <- renderText({
-                                        paste0("Please wait, the application is still loading.")
-                                })
-                                
-                                output$txtPredictedPhrase<- renderText({
-                                        paste0("")
-                                })
-                        }
-                        
-                )         
+                
+                # printedPrediction <- tryCatch(
+                #         {
+                #                 progress$set(message = "Predicting new phrase", value = 0)
+                #                 print("predicting sentence")
+                #                 drR<-predictSentence(myinput= testGram)
+                #                 print("sentence predicted")
+                #                 #get the first row of drR
+                #                 output$txtRestate <- renderText({
+                #                         paste0("The tested phrase is", testGram,".")
+                #                 })
+                #                 output$txtPredictedPhrase<- renderText({
+                #                         paste0("The predicted phrase is", testGram,".")
+                #                 })
+                #                 
+                #                 output$mytable = renderDataTable({
+                #                         top_n(drR,10,prob_result)
+                #                 })
+                #                 
+                #         }, error = function(err){
+                #                 #print to the screen that the phrase cannot be predicted
+                #                 output$txtRestate <- renderText({
+                #                         paste("Please wait, the application is still loading.",geterrmessage())
+                #                         
+                #                         
+                #                 })
+                #                 
+                #                 output$txtPredictedPhrase<- renderText({
+                #                         paste0("")
+                #                 })
+                #         }
+                #         
+                # )         
                        
         }
         )        

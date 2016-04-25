@@ -13,16 +13,16 @@ startLine <- 1
 print("reading corpus")
 
 #read in corpora texts
-(corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
-
-corpora<-tm_map(corpora,content_transformer(tolower))
-corpora<-tm_map(corpora,removeNumbers)
-corpora<-tm_map(corpora,removePunctuation)
-#corpora<-tm_map(corpora, removeWords, stopwords("english"))
-#corpora<-tm_map(corpora, removeWords, stopwords("SMART"))
-corpora<-tm_map(corpora,removeWords, profanity) #removeWords comes from the tm package
-corpora<-tm_map(corpora,stripWhitespace)
-print("corpora loaded")
+# (corpora <- VCorpus(DirSource("temp/"),readerControl=list(language="english")))
+# 
+# corpora<-tm_map(corpora,content_transformer(tolower))
+# corpora<-tm_map(corpora,removeNumbers)
+# corpora<-tm_map(corpora,removePunctuation)
+# #corpora<-tm_map(corpora, removeWords, stopwords("english"))
+# #corpora<-tm_map(corpora, removeWords, stopwords("SMART"))
+# corpora<-tm_map(corpora,removeWords, profanity) #removeWords comes from the tm package
+# corpora<-tm_map(corpora,stripWhitespace)
+# print("corpora loaded")
 
 print("createTextFrequencyDF")
 createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDataFrame=TRUE){
@@ -63,43 +63,58 @@ createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDa
         
 }
 print("createTextFrequencyDF loaded")
-options(mc.cores=1)  #on MacOS you have to set the cores to single
-print("creating tokenizer functions")
-UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
-ugf<-createTextFrequencyDF(controlArg =  list(tokenize = UnigramTokenizer),corpustext = corpora,source="unigram",transformToDataFrame = TRUE)
 
-BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
-bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="bigram",transformToDataFrame = TRUE)
+#options(mc.cores=1)  #on MacOS you have to set the cores to single
 
-TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
-tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="trigram",transformToDataFrame = TRUE)
+print("reading in ngram files")
 
-TetgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
-tetgf<-createTextFrequencyDF(controlArg =  list(tokenize =  TetgramTokenizer),corpustext = corpora, source="tetragram",transformToDataFrame = TRUE)
-print("creating tokenizer created")
+# UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+# ugf<-createTextFrequencyDF(controlArg =  list(tokenize = UnigramTokenizer),corpustext = corpora,source="unigram",transformToDataFrame = TRUE)
+# saveRDS(ugf,"ugf.rds") 
+# BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+# bgf<-createTextFrequencyDF(controlArg =  list(tokenize = BigramTokenizer),corpustext = corpora,source="bigram",transformToDataFrame = TRUE)
+# saveRDS(bgf,"bgf.rds") 
+# TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+# tgf<-createTextFrequencyDF(controlArg =  list(tokenize = TrigramTokenizer),corpustext = corpora, source="trigram",transformToDataFrame = TRUE)
+# saveRDS(tgf,"tgf.rds")
+print("reading ngram files")
+options(mc.cores=1)
+ugf<-readRDS("ugf.rds")
+bgf<-readRDS("bgf.rds")
+tgf<-readRDS("tgf.rds")
+
+print("ngram files read")
 
 print("getMyWordProbability")
 getMyWordProbability<-function(testGram="case of",ngframe=NULL,regexpr="regex"){
         #trigram probabilitiy
-        
+        print(paste("getting word probability using grepped indexes for ",testGram))
+       
         if(regexpr == "regex"){
                 df1<-as.data.frame(filter(ngframe, grepl(paste0("^",testGram,"\\s"),term)),stringsAsFactors=FALSE)
-                
+                #df1<-as.data.frame(ngframe[grep(paste0("^",testGram,"\\s"),tgf$term),],stringsAsFactors=FALSE)
         }
         else{
                 df1<-as.data.frame(filter(ngframe,term==testGram),stringsAsFactors=FALSE)
+                #df1<-as.data.frame(ngframe[grep(paste0("^",testGram,"$"),tgf$term),],stringsAsFactors=FALSE)
         }
-        
-        df1<-cbind(df1,tgsum = sum(df1$occurrences))#delete me
-        
+        print("word probability frame built")
+        #df1<-cbind(df1,tgsum = sum(df1$occurrences))#delete me
+        #head(tgf%>%group_by(source)%>%summarize(tgsum=sum(occurrences)))
+        df1<-df1%>%group_by(source)%>%summarize(tgsum=sum(occurrences))
+        df1<-ungroup(df1)
+        print("word probability frame built and summarized")
+        print(head(df1))
         return(df1)
         
 }
 print("buildProbabilityTable")
 buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
         #find probability of the testGram (a bigram) within the trigram
-        dftgram <- getMyWordProbability(testGram =testGram,ngframe=tgf,regexpr="regex"  )
+        print("building trigram probability")
+        dftgram <<- getMyWordProbability(testGram =testGram,ngframe=tgf,regexpr="regex"  )
         #build a list of the bigrams within the trigram set
+        print("building list of the bigrams within the trigram set")
         l<-apply(dftgram[1],1,
                  function(params)
                          filterNGrams(x=(word(params[1],-2,-1)),
@@ -108,15 +123,19 @@ buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
         
         #find the probability of the bigram on the end of each located trigram
         #this is a list of data frames, each frame must be extracted as a row and appended
-        dfbgram<-apply(as.data.frame(l),1,function(params)getMyWordProbability(testGram=params[1],ngframe=bgf,regexpr="nonreg"))
-        dft<-NULL
+        print("building bigram probability")
+         dfbgram<<-apply(as.data.frame(l),1,function(params)getMyWordProbability(testGram=params[1],ngframe=bgf,regexpr="nonreg"))
+        print (head(dfbgram))
+         
+         dft<-NULL
+         print("appending rows")
         for(e in 1:length(dfbgram)) rbind(dft,data.frame(term=dfbgram[[e]]$term,
                                                          occurrences = dfbgram[[e]]$occurrences,
                                                          source= dfbgram[[e]]$source,
                                                          tgsum = dfbgram[[e]]$tgsum),stringsAsFactors=FALSE)->dft
         dfbgram<-dft
         
-        
+        print("filteringNgrams: Unigrams for the end of bigrams-start")
         ## get the last word of each bigram and then find its probability in the unigram set
         l<-apply(dfbgram[1],1,
                  function(params)
@@ -124,10 +143,10 @@ buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
                                       ngDataFrame=ugf)
         )
         
-        #
+        print("filteringNgrams: Unigrams for the end of bigrams-end")
         
-        #getting the unitgram
-        
+        #getting the unigram
+        print("building unigram probability")
         dfugram<-apply(data.frame(unlist(l),stringsAsFactors = FALSE),1,function(params)getMyWordProbability(testGram=params[1],ngframe=ugf,regexpr="nonreg"))
         
         dft<-NULL
@@ -161,14 +180,22 @@ buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
         bgsum<-group_by(dfuResult2, source.y) %>% summarise(bigramsum=sum(tgsum.y))
         ugsum<-group_by(dfuResult2, source) %>% summarise(unigramsum=sum(tgsum))
         dfuResult2<-cbind(dfuResult2,bigramsum=bgsum$bigramsum)%>%cbind(unigramsum=ugsum$unigramsum)
+        return(dfuResult2)
+        print("returned dfuResult for calculations")
         
+}
+
+print("filterNGrams")
+filterNGrams<-function(x="",ngDataFrame=NULL){
         
+        return(filter(ngDataFrame,term==x)$term)
 }
 
 print("predictSentence")
 predictSentence<-function(myinput = "house is")
 {
-        buildProbabilityTable(testGram=myinput)
+        
+        dfuResult2<-buildProbabilityTable(testGram=myinput)
         #call to the result table for doing the model
         
         drR<-data.frame(term=dfuResult2$term, prob_result=(dfuResult2$occurrences.x/dfuResult2$tgsum.x)*.6+

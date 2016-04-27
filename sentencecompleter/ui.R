@@ -18,6 +18,7 @@ shinyUI(fluidPage(
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
+            HTML("<p>This app is reading input data when it first loads. Please wait a moment before using.</p>"),
             HTML("<p>Enter your phrase input in the textbox below and press Go. 
                  The application will predict the next word in your sentence and print it out.
                  Other runner-up suggestions will appear in a table below the primary prediction.</p>"), 

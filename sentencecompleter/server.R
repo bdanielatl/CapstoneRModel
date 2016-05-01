@@ -8,21 +8,7 @@
 #
 
 library(shiny)
-#read in the english files into objects
-#requuire the tm library
-require(NLP)
-require(tm)
-require(reader)
-require(LaF)
-#require(wordcloud)
-require(RTextTools)
-require(RWeka)
-require(slam)
-require(tau)
-require(SnowballC)
-require(dplyr)
-require(stringi)
-require(stringr)
+
 
 
 
@@ -30,7 +16,7 @@ require(stringr)
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
         
-        source("textHelpers.R") 
+    
         
         observeEvent(input$goButton,{
                 
@@ -59,7 +45,7 @@ shinyServer(function(input, output) {
                                 
                                 #get the first row of drR
                                 output$txtRestate <- renderText({
-                                        paste0("The tested phrase is ", testGram,".")
+                                        paste0("The tested phrase is '", testGram,"'.")
                                 })
                                 
                                 tdd<-top_n(drR,1,prob_result)$term
@@ -69,7 +55,7 @@ shinyServer(function(input, output) {
                                 predWord<-sl[length(sl)]
                                 
                                 output$txtPredictedPhrase<- renderText({
-                                        paste0("The predicted word is ", predWord,".")
+                                        paste0("The predicted word is '", predWord,"'.")
                                 })
                                 
                                 output$mytable = renderDataTable({

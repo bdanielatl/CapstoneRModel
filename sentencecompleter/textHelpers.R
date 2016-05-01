@@ -23,45 +23,7 @@ startLine <- 1
 # corpora<-tm_map(corpora,stripWhitespace)
 # print("corpora loaded")
 
-print("createTextFrequencyDF")
-createTextFrequencyDF <- function (corpustext,controlArg,source="",transformToDataFrame=TRUE){
-        if(is.null(controlArg)){
-                dtm<-DocumentTermMatrix(corpustext)
-                removeSparseTerms(dtm,.25)
-                #create a matrix and sort it 
-                #decreasing each item in matrix will be a word with a nubmer value 
-                freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
-                ord<-order(freq,decreasing=TRUE)
-        }
-        else{
-                #create a document term matrix from the corpora for analysis
-                dtm<-DocumentTermMatrix(corpustext,control=controlArg)
-                removeSparseTerms(dtm,.25)
-                #create a matrix and sort it 
-                #decreasing each item in matrix will be a word with a nubmer value 
-                freq<-sort(colSums(as.matrix(dtm)),decreasing = TRUE) 
-                ord<-order(freq,decreasing=TRUE)
-                #length(freq) #how many terms do I have (tell me the lengt)
-        }
-        
-        if(transformToDataFrame==TRUE)
-        {
-                #build pareto analysis of the terms
-                wf=data.frame(term=names(freq),
-                              occurrences=freq,
-                              #cumfreqpct=cumsum((freq/sum(freq))*100),
-                              source=as.character(source),stringsAsFactors = FALSE
-                )
-                wf$source = as.character(wf$source)
-                return (wf)
-        }
-        else{
-                return (dtm)
-        }
-        
-        
-}
-print("createTextFrequencyDF loaded")
+
 # options(mc.cores=1)  #on MacOS you have to set the cores to single
 # print("creating tokenizer functions")
 # UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))

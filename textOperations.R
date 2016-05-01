@@ -93,7 +93,7 @@ buildProbabilityTable<-function(testGram="case of",ngframe =tgf){
 
 predictSentence<-function(myinput = "")
 {
-        buildProbabilityTable(testGram=myinput)
+        dfuResult2<-buildProbabilityTable(testGram=myinput)
         #call to the result table for doing the model
         
         drR<-data.frame(term=dfuResult2$term, prob_result=(dfuResult2$occurrences.x/dfuResult2$tgsum.x)*.6+
